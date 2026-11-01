@@ -63,7 +63,11 @@ Los montos se guardan en `NUMERIC(14,2)` y se calculan con Decimal.js, redondean
 - Los pagos y cobros tienen clave de idempotencia, bloqueo de fila y control del saldo en PostgreSQL. No se editan: se anulan y se vuelven a registrar. Los gastos se pueden rectificar con auditoría.
 - No se eliminan movimientos reales; las bajas de personal y vehículos son desactivaciones. La auditoría registra quién cambió qué, antes/después y el motivo de las anulaciones.
 
-Se cargan las dos camionetas, cuatro empleados, asignaciones y categorías definidos en el prompt. Patentes y salarios quedan pendientes. Federico tiene frecuencia semanal y Eduardo quincenal, sin importes inventados. La camioneta 1 conserva su tarifa diaria configurable. La camioneta 2 tiene los tipos de trabajo y tarifas indicados por el administrador.
+Se cargan las dos camionetas, cuatro empleados, asignaciones y categorías definidos en el prompt. Patentes y salarios quedan pendientes. Federico tiene frecuencia semanal y Eduardo quincenal, sin importes inventados. Cada camioneta tiene los tipos de trabajo y tarifas indicados por el administrador.
+
+### Camioneta 1: jornada fija y ambulancias
+
+La jornada fija tiene un importe de $200.000 y aparece seleccionada por defecto al registrar un día nuevo. También se puede elegir Ambulancia 100% ($200.000), Ambulancia 50% ($100.000) o Ambulancia chica ($80.000). El importe se completa automáticamente y estas opciones no requieren kilómetros. Solo se ofrecen en la camioneta que tiene configurado este tarifario. Las tarifas quedan conservadas en las jornadas, se muestran en el historial y se incluyen en los reportes. La configuración permite editar los importes para las jornadas nuevas.
 
 ### Tipos de trabajo de la camioneta 2
 

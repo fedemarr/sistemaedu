@@ -13,6 +13,8 @@ import { previewPayroll } from "@/app/actions";
 import {
   SERVICE_BANDS,
   SERVICE_LABELS,
+  availableServices,
+  pricingRateFields,
   serviceQuote,
   type ServiceType,
 } from "@/lib/service-pricing";
@@ -100,22 +102,12 @@ export function VehicleForm({ vehicle }: { vehicle?: Vehicle }) {
             value={vehicle.default_daily_rate ?? ""}
           />
           <div className="form-grid">
-            <Amount
-              name="rate_colecta"
-              label="Colecta (ARS)"
-              defaultValue={vehicle.service_pricing.colecta}
-            />
-            <Amount
-              name="rate_ultima_milla"
-              label="Última milla (ARS)"
-              defaultValue={vehicle.service_pricing.ultima_milla}
-            />
-            {SERVICE_BANDS.map((b) => (
+            {pricingRateFields(vehicle.service_pricing).map((b) => (
               <Amount
                 key={b.key}
                 name={"rate_" + b.key}
-                label={"Voluminoso · " + b.label + " (ARS)"}
-                defaultValue={vehicle.service_pricing![b.key]}
+                label={b.label + " (ARS)"}
+                defaultValue={b.amount}
               />
             ))}
           </div>
@@ -252,7 +244,7 @@ export function DayForm({
   const [worked, setWorked] = useState(day?.worked ?? initialWorked);
   const pricing = day?.pricing_snapshot ?? vehicle.service_pricing;
   const [workType, setWorkType] = useState<ServiceType | "">(
-    day?.work_type ?? "",
+    day?.work_type ?? (pricing && "fija" in pricing && !day ? "fija" : ""),
   );
   const [km, setKm] = useState(day?.distance_km ?? "");
   let quote: ReturnType<typeof serviceQuote> | null = null,
@@ -327,9 +319,9 @@ export function DayForm({
                       ? "Histórico · conservar importe manual"
                       : "Elegir tipo de trabajo"}
                   </option>
-                  {Object.entries(SERVICE_LABELS).map(([value, label]) => (
+                  {availableServices(pricing).map((value) => (
                     <option key={value} value={value}>
-                      {label}
+                      {SERVICE_LABELS[value]}
                     </option>
                   ))}
                 </select>
@@ -374,7 +366,7 @@ export function DayForm({
                   {pricingError}
                 </p>
               )}
-              {workType === "voluminoso" && (
+              {workType === "voluminoso" && "voluminoso_50" in pricing && (
                 <details>
                   <summary className="text-button">
                     Ver tarifas de voluminoso

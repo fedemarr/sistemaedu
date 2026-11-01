@@ -133,7 +133,9 @@ export function VehicleCard({
             {day
               ? currency(day.revenue_amount)
               : vehicle.service_pricing
-                ? "Según el trabajo"
+                ? "fija" in vehicle.service_pricing
+                  ? currency(vehicle.service_pricing.fija)
+                  : "Según el trabajo"
                 : vehicle.default_daily_rate !== null
                   ? currency(vehicle.default_daily_rate)
                   : "A configurar"}

@@ -375,7 +375,9 @@ export function DailyModule({
                         {d
                           ? currency(d.revenue_amount)
                           : v.service_pricing
-                            ? "Según el trabajo"
+                            ? "fija" in v.service_pricing
+                              ? currency(v.service_pricing.fija)
+                              : "Según el trabajo"
                             : v.default_daily_rate !== null
                               ? currency(v.default_daily_rate)
                               : "A configurar"}
@@ -505,7 +507,9 @@ export function VehiclesModule({
                   <span>Tarifa por día</span>
                   <strong>
                     {v.service_pricing
-                      ? "Según el trabajo"
+                      ? "fija" in v.service_pricing
+                        ? currency(v.service_pricing.fija)
+                        : "Según el trabajo"
                       : v.default_daily_rate !== null
                         ? currency(v.default_daily_rate)
                         : "A configurar"}
