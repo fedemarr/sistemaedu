@@ -10,6 +10,12 @@ import type {
 } from "@/lib/types";
 import { today, dateLabel, currency, balance, sum } from "@/lib/domain";
 import { previewPayroll } from "@/app/actions";
+import {
+  SERVICE_BANDS,
+  SERVICE_LABELS,
+  serviceQuote,
+  type ServiceType,
+} from "@/lib/service-pricing";
 import { Field, Input, Amount, SaveForm, Notes, Badge } from "./ui";
 
 export function VehicleSelect({
@@ -72,13 +78,49 @@ export function VehicleForm({ vehicle }: { vehicle?: Vehicle }) {
             defaultValue={vehicle?.year ?? ""}
           />
         </Field>
-        <Amount
-          name="default_daily_rate"
-          label="Tarifa diaria predeterminada (ARS)"
-          defaultValue={vehicle?.default_daily_rate}
-          required={false}
-        />
+        {!vehicle?.service_pricing && (
+          <Amount
+            name="default_daily_rate"
+            label="Tarifa diaria predeterminada (ARS)"
+            defaultValue={vehicle?.default_daily_rate}
+            required={false}
+          />
+        )}
       </div>
+      {vehicle?.service_pricing && (
+        <div className="form-section">
+          <h3>Tarifas por tipo de trabajo</h3>
+          <p>
+            Estos importes se aplican a las nuevas jornadas. Las anteriores
+            conservan su tarifario.
+          </p>
+          <input
+            type="hidden"
+            name="default_daily_rate"
+            value={vehicle.default_daily_rate ?? ""}
+          />
+          <div className="form-grid">
+            <Amount
+              name="rate_colecta"
+              label="Colecta (ARS)"
+              defaultValue={vehicle.service_pricing.colecta}
+            />
+            <Amount
+              name="rate_ultima_milla"
+              label="Última milla (ARS)"
+              defaultValue={vehicle.service_pricing.ultima_milla}
+            />
+            {SERVICE_BANDS.map((b) => (
+              <Amount
+                key={b.key}
+                name={"rate_" + b.key}
+                label={"Voluminoso · " + b.label + " (ARS)"}
+                defaultValue={vehicle.service_pricing![b.key]}
+              />
+            ))}
+          </div>
+        </div>
+      )}
       <Field label="Estado">
         <select
           name="is_active"
@@ -208,6 +250,21 @@ export function DayForm({
   worked?: boolean;
 }) {
   const [worked, setWorked] = useState(day?.worked ?? initialWorked);
+  const pricing = day?.pricing_snapshot ?? vehicle.service_pricing;
+  const [workType, setWorkType] = useState<ServiceType | "">(
+    day?.work_type ?? "",
+  );
+  const [km, setKm] = useState(day?.distance_km ?? "");
+  let quote: ReturnType<typeof serviceQuote> | null = null,
+    pricingError = "";
+  if (pricing && workType) {
+    try {
+      quote = serviceQuote(pricing, workType, km);
+    } catch (e) {
+      pricingError = (e as Error).message;
+    }
+  }
+  const legacyManual = !!day?.worked && !day.work_type && workType === "";
   const assigned = (role: string) =>
     data.assignments.find(
       (a) =>
@@ -222,6 +279,7 @@ export function DayForm({
     <SaveForm
       operation="day"
       submitLabel={day ? "Actualizar jornada" : "Registrar jornada"}
+      disableSubmit={!!(worked && pricing && !legacyManual && !quote)}
     >
       <input name="id" type="hidden" value={day?.id ?? ""} />
       <input name="version" type="hidden" value={day?.updated_at ?? ""} />
@@ -253,11 +311,101 @@ export function DayForm({
       </Field>
       {worked ? (
         <>
-          <Amount
-            name="revenue_amount"
-            label="Facturación del día (ARS)"
-            defaultValue={day?.revenue_amount ?? vehicle.default_daily_rate}
-          />
+          {pricing && (
+            <>
+              <Field label="¿Qué trabajo realizó?">
+                <select
+                  name="work_type"
+                  value={workType}
+                  onChange={(e) =>
+                    setWorkType(e.target.value as ServiceType | "")
+                  }
+                  required={!legacyManual}
+                >
+                  <option value="" disabled={!legacyManual}>
+                    {legacyManual
+                      ? "Histórico · conservar importe manual"
+                      : "Elegir tipo de trabajo"}
+                  </option>
+                  {Object.entries(SERVICE_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              {workType === "voluminoso" && (
+                <Field
+                  label="Kilómetros recorridos"
+                  hint="Ingresá el total de kilómetros. Se elige automáticamente el tramo correspondiente."
+                >
+                  <Input
+                    name="distance_km"
+                    type="number"
+                    min="0"
+                    max="180"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={km}
+                    onChange={(e) => setKm(e.target.value)}
+                    placeholder="Por ejemplo, 95"
+                    required
+                  />
+                </Field>
+              )}
+              {quote && (
+                <div className="payroll-preview" role="status">
+                  <Badge tone="blue">
+                    {SERVICE_LABELS[workType as ServiceType]}
+                  </Badge>
+                  <div>
+                    <span>{quote.band}</span>
+                    <strong>{currency(quote.amount)}</strong>
+                  </div>
+                  <p className="hint">
+                    {day?.pricing_snapshot
+                      ? "Tarifario conservado de esta jornada."
+                      : "Importe total de la jornada, calculado automáticamente."}
+                  </p>
+                </div>
+              )}
+              {pricingError && (
+                <p className="feedback error" role="status">
+                  {pricingError}
+                </p>
+              )}
+              {workType === "voluminoso" && (
+                <details>
+                  <summary className="text-button">
+                    Ver tarifas de voluminoso
+                  </summary>
+                  <div className="payroll-preview">
+                    {SERVICE_BANDS.map((b) => (
+                      <div key={b.key}>
+                        <span>{b.label}</span>
+                        <strong>{currency(pricing[b.key])}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </>
+          )}
+          {pricing && !legacyManual ? (
+            <Field label="Facturación del día (ARS)">
+              <Input
+                name="revenue_amount"
+                value={quote?.amount ?? ""}
+                readOnly
+              />
+            </Field>
+          ) : (
+            <Amount
+              name="revenue_amount"
+              label="Facturación del día (ARS)"
+              defaultValue={day?.revenue_amount ?? vehicle.default_daily_rate}
+            />
+          )}
           <div className="form-grid">
             {(["chofer", "ayudante"] as const).map((role, i) => (
               <div key={role}>

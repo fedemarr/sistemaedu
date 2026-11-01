@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth";
 import { asAdmin, loadData } from "@/lib/db";
 import { parseFilters } from "@/lib/filters";
 import { report, dateLabel, currency } from "@/lib/domain";
+import { SERVICE_LABELS } from "@/lib/service-pricing";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
@@ -38,6 +39,8 @@ export async function GET(request: NextRequest) {
       })
       .join(", "),
     d.notes ?? "",
+    d.work_type ? SERVICE_LABELS[d.work_type] : "",
+    d.distance_km ?? "",
   ]);
   const expenses = r.expenses.map((e) => [
     e.expense_date,
@@ -112,6 +115,8 @@ export async function GET(request: NextRequest) {
         "Facturación ARS",
         "Personal",
         "Observaciones",
+        "Tipo de trabajo",
+        "Kilómetros",
       ],
       detail,
     );
@@ -259,9 +264,21 @@ export async function GET(request: NextRequest) {
   doc.text("Detalle de jornadas", 14, 20);
   autoTable(doc, {
     startY: 26,
-    head: [["Fecha", "Camioneta", "Trabajó", "Facturación", "Personal"]],
+    head: [
+      [
+        "Fecha",
+        "Camioneta",
+        "Trabajó",
+        "Facturación",
+        "Personal",
+        "Trabajo",
+        "Km",
+      ],
+    ],
     body: detail.map((row) =>
-      row.slice(0, 5).map((v, i) => (i === 3 ? currency(v) : String(v))),
+      [...row.slice(0, 5), row[6], row[7]].map((v, i) =>
+        i === 3 ? currency(v) : String(v),
+      ),
     ),
     styles: { fontSize: 8 },
     headStyles: { fillColor: [16, 33, 59] },

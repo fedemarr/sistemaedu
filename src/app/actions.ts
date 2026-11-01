@@ -4,6 +4,12 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import Decimal from "decimal.js";
+import {
+  servicePricingSchema,
+  serviceType,
+  serviceQuote,
+  type ServicePricing,
+} from "@/lib/service-pricing";
 import { asAdmin, db, loadData, type Tx } from "@/lib/db";
 import { requireAdmin, supabase } from "@/lib/auth";
 import { today, payrollPreview, money, period, addDays } from "@/lib/domain";
@@ -109,11 +115,39 @@ async function saveDay(tx: Tx, f: FormData) {
   if (workDate > today())
     throw new Error("No se pueden registrar jornadas futuras.");
   const worked = get(f, "worked") === "true";
-  const revenue = worked ? amount.parse(get(f, "revenue_amount")) : "0";
+  let revenue = "0";
   const vehicles =
-    await tx`select id,is_active from public.vehicles where id=${vehicleId} for update`;
+    await tx`select id,is_active,service_pricing from public.vehicles where id=${vehicleId} for update`;
   if (!vehicles[0] || (!vehicles[0].is_active && !id))
     throw new Error("La camioneta no está activa.");
+  const existingDay = id
+    ? (
+        await tx`select worked,work_type,pricing_snapshot from public.work_days where id=${id} and vehicle_id=${vehicleId}`
+      )[0]
+    : null;
+  const pricing = existingDay?.pricing_snapshot ?? vehicles[0].service_pricing;
+  let selectedService: string | null = null,
+    kilometers: string | null = null,
+    pricingSnapshot: ServicePricing | null = null;
+  if (worked) {
+    if (
+      pricing &&
+      (get(f, "work_type") !== "" ||
+        !existingDay ||
+        !existingDay.worked ||
+        existingDay.work_type)
+    ) {
+      selectedService = serviceType.parse(get(f, "work_type"));
+      kilometers =
+        selectedService === "voluminoso" ? get(f, "distance_km") : null;
+      pricingSnapshot = servicePricingSchema.parse(pricing);
+      revenue = serviceQuote(
+        pricingSnapshot,
+        serviceType.parse(selectedService),
+        kilometers ?? "",
+      ).amount;
+    } else revenue = amount.parse(get(f, "revenue_amount"));
+  }
   const previousAttendance = id
     ? await tx`select employee_id,role,salary_amount,salary_model from public.work_day_employees where work_day_id=${id}`
     : [];
@@ -194,7 +228,7 @@ async function saveDay(tx: Tx, f: FormData) {
   let dayId = id;
   if (id) {
     const updated =
-      await tx`update public.work_days set worked=${worked},revenue_amount=${revenue},notes=${nullable(text.parse(get(f, "notes")))},updated_at=now() where id=${id} and vehicle_id=${vehicleId} and work_date=${workDate} and updated_at=${get(f, "version")}::timestamptz returning id`;
+      await tx`update public.work_days set worked=${worked},revenue_amount=${revenue},work_type=${selectedService},distance_km=${kilometers},pricing_snapshot=${pricingSnapshot ? tx.json(pricingSnapshot) : null},notes=${nullable(text.parse(get(f, "notes")))},updated_at=now() where id=${id} and vehicle_id=${vehicleId} and work_date=${workDate} and updated_at=${get(f, "version")}::timestamptz returning id`;
     if (!updated.length)
       throw new Error(
         "La jornada cambió en otra ventana. Actualizá la página antes de editar.",
@@ -202,7 +236,7 @@ async function saveDay(tx: Tx, f: FormData) {
     await tx`delete from public.work_day_employees where work_day_id=${id}`;
   } else {
     const inserted =
-      await tx`insert into public.work_days(vehicle_id,work_date,worked,revenue_amount,notes) values(${vehicleId},${workDate},${worked},${revenue},${nullable(text.parse(get(f, "notes")))}) returning id`;
+      await tx`insert into public.work_days(vehicle_id,work_date,worked,revenue_amount,work_type,distance_km,pricing_snapshot,notes) values(${vehicleId},${workDate},${worked},${revenue},${selectedService},${kilometers},${pricingSnapshot ? tx.json(pricingSnapshot) : null},${nullable(text.parse(get(f, "notes")))}) returning id`;
     dayId = inserted[0].id;
   }
   for (const a of staff)
@@ -210,6 +244,19 @@ async function saveDay(tx: Tx, f: FormData) {
 }
 async function saveVehicle(tx: Tx, f: FormData) {
   const id = optionalId.parse(get(f, "id"));
+  const current = id
+    ? (await tx`select service_pricing from public.vehicles where id=${id}`)[0]
+    : null;
+  const servicePricing = current?.service_pricing
+    ? servicePricingSchema.parse(
+        Object.fromEntries(
+          Object.keys(current.service_pricing).map((key) => [
+            key,
+            get(f, "rate_" + key),
+          ]),
+        ),
+      )
+    : null;
   const values = {
     name: name.parse(get(f, "name")),
     license_plate: nullable(text.parse(get(f, "license_plate"))),
@@ -219,6 +266,7 @@ async function saveVehicle(tx: Tx, f: FormData) {
       ? z.coerce.number().int().min(1900).max(2100).parse(get(f, "year"))
       : null,
     default_daily_rate: optionalAmount.parse(get(f, "default_daily_rate")),
+    service_pricing: servicePricing ? tx.json(servicePricing) : null,
     is_active: get(f, "is_active") === "true",
     notes: nullable(text.parse(get(f, "notes"))),
   };

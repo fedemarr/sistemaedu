@@ -39,11 +39,11 @@ export async function loadData(
 ): Promise<Data> {
   // One statement gives a consistent snapshot without one network round trip per table.
   const rows = await tx<{ data: Data }[]>`select jsonb_build_object(
- 'vehicles',(select coalesce(jsonb_agg(v),'[]') from (select id,name,license_plate,brand,model,year,default_daily_rate::text,is_active,notes from public.vehicles order by name) v),
+ 'vehicles',(select coalesce(jsonb_agg(v),'[]') from (select id,name,license_plate,brand,model,year,default_daily_rate::text,service_pricing,is_active,notes from public.vehicles order by name) v),
  'employees',(select coalesce(jsonb_agg(e),'[]') from (select id,first_name,last_name,role,is_active,notes from public.employees order by first_name) e),
  'assignments',(select coalesce(jsonb_agg(a),'[]') from (select id,employee_id,vehicle_id,role,start_date,end_date from public.employee_assignments order by start_date desc) a),
  'salaries',(select coalesce(jsonb_agg(s),'[]') from (select id,employee_id,payment_model,payment_frequency,amount::text,valid_from,valid_until from public.salary_settings order by valid_from desc) s),
- 'days',(select coalesce(jsonb_agg(d),'[]') from (select id,vehicle_id,work_date,worked,revenue_amount::text,notes,updated_at::text from public.work_days where work_date between ${start} and ${end} or id in (select distinct on (vehicle_id) id from public.work_days where worked and work_date<=(now() at time zone 'America/Argentina/Buenos_Aires')::date order by vehicle_id,work_date desc) order by work_date desc) d),
+ 'days',(select coalesce(jsonb_agg(d),'[]') from (select id,vehicle_id,work_date,worked,revenue_amount::text,work_type,distance_km::text,pricing_snapshot,notes,updated_at::text from public.work_days where work_date between ${start} and ${end} or id in (select distinct on (vehicle_id) id from public.work_days where worked and work_date<=(now() at time zone 'America/Argentina/Buenos_Aires')::date order by vehicle_id,work_date desc) order by work_date desc) d),
  'attendance',(select coalesce(jsonb_agg(a),'[]') from (select we.id,we.work_day_id,we.employee_id,we.role,we.salary_amount::text,we.salary_model from public.work_day_employees we join public.work_days d on d.id=we.work_day_id where d.work_date between ${start} and ${end}) a),
  'categories',(select coalesce(jsonb_agg(c),'[]') from (select id,name,is_active from public.expense_categories order by name) c),
  'expenses',(select coalesce(jsonb_agg(e),'[]') from (select id,vehicle_id,category_id,expense_date,description,amount::text,payment_date,payment_method,notes,voided_at::text,updated_at::text from public.expenses where expense_date between ${start} and ${end} or payment_date between ${start} and ${end} order by expense_date desc) e),

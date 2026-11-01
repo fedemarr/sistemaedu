@@ -14,6 +14,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import type { Data, Vehicle } from "@/lib/types";
+import { workDescription } from "@/lib/service-pricing";
 import {
   today,
   currency,
@@ -131,9 +132,11 @@ export function VehicleCard({
           <strong>
             {day
               ? currency(day.revenue_amount)
-              : vehicle.default_daily_rate !== null
-                ? currency(vehicle.default_daily_rate)
-                : "A configurar"}
+              : vehicle.service_pricing
+                ? "Según el trabajo"
+                : vehicle.default_daily_rate !== null
+                  ? currency(vehicle.default_daily_rate)
+                  : "A configurar"}
           </strong>
         </div>
         <div>
@@ -141,6 +144,11 @@ export function VehicleCard({
           <strong>{currency(monthly.revenue)}</strong>
         </div>
       </div>
+      {day?.work_type && (
+        <p className="hint" style={{ marginTop: 10 }}>
+          {workDescription(day)}
+        </p>
+      )}
       <p className="last-day">
         <CalendarDays size={14} />
         {last
@@ -224,7 +232,7 @@ export function Dashboard({ data, month }: { data: Data; month: string }) {
       ),
   );
   const missingRates = data.vehicles.filter(
-    (v) => v.is_active && v.default_daily_rate === null,
+    (v) => v.is_active && v.default_daily_rate === null && !v.service_pricing,
   );
   const fmtMonth = new Intl.DateTimeFormat("es-AR", {
     month: "long",

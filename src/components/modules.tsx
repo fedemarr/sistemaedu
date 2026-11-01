@@ -13,6 +13,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import type { Data, Day } from "@/lib/types";
+import { workDescription } from "@/lib/service-pricing";
 import {
   today,
   period,
@@ -145,6 +146,7 @@ function DayTable({ data, days }: { data: Data; days: Day[] }) {
         "Fecha",
         "Camioneta",
         "Estado",
+        "Trabajo / km",
         "Personal",
         "Facturación",
         "Cobrado",
@@ -168,13 +170,20 @@ function DayTable({ data, days }: { data: Data; days: Day[] }) {
           .map((a) => fullName(data, a.employee_id));
         return {
           key: d.id,
-          search: [d.work_date, vehicle.name, ...staff, d.notes].join(" "),
+          search: [
+            d.work_date,
+            vehicle.name,
+            workDescription(d),
+            ...staff,
+            d.notes,
+          ].join(" "),
           cells: [
             dateLabel(d.work_date),
             <strong key="v">{vehicle.name}</strong>,
             <Badge key="s" tone={d.worked ? "green" : "neutral"}>
               {d.worked ? "Trabajó" : "Sin actividad"}
             </Badge>,
+            workDescription(d) || "—",
             <div key="e" className="staff-list">
               {staff.map((s) => (
                 <span key={s}>{s}</span>
@@ -365,9 +374,11 @@ export function DailyModule({
                       <strong>
                         {d
                           ? currency(d.revenue_amount)
-                          : v.default_daily_rate !== null
-                            ? currency(v.default_daily_rate)
-                            : "A configurar"}
+                          : v.service_pricing
+                            ? "Según el trabajo"
+                            : v.default_daily_rate !== null
+                              ? currency(v.default_daily_rate)
+                              : "A configurar"}
                       </strong>
                     </div>
                     <Modal
@@ -493,9 +504,11 @@ export function VehiclesModule({
                 <div>
                   <span>Tarifa por día</span>
                   <strong>
-                    {v.default_daily_rate !== null
-                      ? currency(v.default_daily_rate)
-                      : "A configurar"}
+                    {v.service_pricing
+                      ? "Según el trabajo"
+                      : v.default_daily_rate !== null
+                        ? currency(v.default_daily_rate)
+                        : "A configurar"}
                   </strong>
                 </div>
               </div>

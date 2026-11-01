@@ -1,5 +1,6 @@
 export type Model = "daily" | "weekly" | "biweekly" | "monthly";
 export type Frequency = "weekly" | "biweekly" | "monthly";
+import type { ServicePricing, ServiceType } from "./service-pricing";
 export interface Vehicle {
   id: string;
   name: string;
@@ -8,6 +9,7 @@ export interface Vehicle {
   model: string | null;
   year: number | null;
   default_daily_rate: string | null;
+  service_pricing?: ServicePricing | null;
   is_active: boolean;
   notes: string | null;
 }
@@ -42,6 +44,9 @@ export interface Day {
   work_date: string;
   worked: boolean;
   revenue_amount: string;
+  work_type?: ServiceType | null;
+  distance_km?: string | null;
+  pricing_snapshot?: ServicePricing | null;
   notes: string | null;
   updated_at: string;
 }

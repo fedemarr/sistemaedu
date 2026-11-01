@@ -63,7 +63,13 @@ Los montos se guardan en `NUMERIC(14,2)` y se calculan con Decimal.js, redondean
 - Los pagos y cobros tienen clave de idempotencia, bloqueo de fila y control del saldo en PostgreSQL. No se editan: se anulan y se vuelven a registrar. Los gastos se pueden rectificar con auditoría.
 - No se eliminan movimientos reales; las bajas de personal y vehículos son desactivaciones. La auditoría registra quién cambió qué, antes/después y el motivo de las anulaciones.
 
-Se cargan solo las dos camionetas, cuatro empleados, asignaciones y categorías definidos en el prompt. Patentes, salarios y tarifas quedan pendientes. Federico tiene frecuencia semanal y Eduardo quincenal, sin importes inventados.
+Se cargan las dos camionetas, cuatro empleados, asignaciones y categorías definidos en el prompt. Patentes y salarios quedan pendientes. Federico tiene frecuencia semanal y Eduardo quincenal, sin importes inventados. La camioneta 1 conserva su tarifa diaria configurable. La camioneta 2 tiene los tipos de trabajo y tarifas indicados por el administrador.
+
+### Tipos de trabajo de la camioneta 2
+
+Al marcar que trabajó, se elige Colecta ($180.000), Última milla ($200.000) o Voluminoso. Para Voluminoso se ingresan kilómetros y se aplica el importe total del tramo: 0–50 km $174.000; más de 50 hasta 80 km $197.000; más de 80 hasta 110 km $227.000; más de 110 hasta 140 km $243.000; más de 140 hasta 180 km $259.000. Se admiten hasta dos decimales de kilómetros. Los límites superiores están incluidos y los recorridos superiores a 180 km se bloquean porque no tienen tarifa definida.
+
+El servidor calcula el importe con el tarifario de la camioneta y PostgreSQL valida su coincidencia. Cada jornada conserva tipo de trabajo, kilómetros y una copia del tarifario aplicado. Editar una jornada utiliza su tarifario conservado; las nuevas tarifas de Configuración/Camionetas solo afectan jornadas nuevas. Las jornadas anteriores a esta función mantienen su importe manual salvo que se seleccione expresamente un tipo de trabajo. El historial y las exportaciones incluyen el trabajo y los kilómetros.
 
 ## Arquitectura
 
