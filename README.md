@@ -1,5 +1,7 @@
 # Gestión Transporte Eduardo
 
+Aplicación publicada: [sistemaedu-ten.vercel.app](https://sistemaedu-ten.vercel.app).
+
 Aplicación privada para administrar jornadas, camionetas, empleados, gastos, sueldos, cobros y reportes. Next.js App Router, React, TypeScript, Tailwind, Lucide, Recharts, Supabase Auth y PostgreSQL.
 
 ## Instalación
