@@ -1,0 +1,6 @@
+.env*
+!.env.example
+test-results
+playwright-report
+private
+PROMPT_MAESTRO_GESTION_TRANSPORTE_EDUARDO.md
