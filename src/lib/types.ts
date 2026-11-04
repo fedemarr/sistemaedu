@@ -42,6 +42,7 @@ export interface Day {
   id: string;
   vehicle_id: string;
   work_date: string;
+  shift_number?: number;
   worked: boolean;
   revenue_amount: string;
   work_type?: ServiceType | null;
@@ -114,6 +115,7 @@ export interface Collection {
   voided_at: string | null;
   vehicle_id?: string;
   work_date?: string;
+  shift_number?: number;
 }
 export interface Accrual {
   payroll_period_id?: string;

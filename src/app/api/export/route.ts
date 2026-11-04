@@ -35,12 +35,16 @@ export async function GET(request: NextRequest) {
       .filter((a) => a.work_day_id === d.id)
       .map((a) => {
         const e = data.employees.find((e) => e.id === a.employee_id);
-        return e?.first_name + " " + e?.last_name;
+        return (
+          (a.role === "chofer" ? "Chofer: " : "Ayudante: ") +
+          (e ? e.first_name + " " + e.last_name : "Sin identificar")
+        );
       })
       .join(", "),
     d.notes ?? "",
     d.work_type ? SERVICE_LABELS[d.work_type] : "",
     d.distance_km ?? "",
+    d.shift_number ?? 1,
   ]);
   const expenses = r.expenses.map((e) => [
     e.expense_date,
@@ -117,6 +121,7 @@ export async function GET(request: NextRequest) {
         "Observaciones",
         "Tipo de trabajo",
         "Kilómetros",
+        "Jornada",
       ],
       detail,
     );
@@ -273,10 +278,11 @@ export async function GET(request: NextRequest) {
         "Personal",
         "Trabajo",
         "Km",
+        "Jornada",
       ],
     ],
     body: detail.map((row) =>
-      [...row.slice(0, 5), row[6], row[7]].map((v, i) =>
+      [...row.slice(0, 5), row[6], row[7], row[8]].map((v, i) =>
         i === 3 ? currency(v) : String(v),
       ),
     ),

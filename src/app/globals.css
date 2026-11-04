@@ -1,4 +1,84 @@
 @import "tailwindcss";
+.double-day-marker {
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  color: #2563eb;
+}
+.calendar-day.selected .double-day-marker {
+  color: white;
+}
+.vehicle-journals {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 0;
+}
+.shift-row {
+  border: 1px solid #e3eaf5;
+  background: #fbfcff;
+  border-radius: 10px;
+  padding: 12px;
+  min-width: 0;
+}
+.shift-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+}
+.shift-amount {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.shift-row .vehicle-crew {
+  margin: 12px 0;
+}
+.shift-row > .hint {
+  margin-top: 6px;
+}
+.shift-row .button {
+  min-height: 40px;
+}
+.journal-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.vehicle-journals > .modal-trigger,
+.add-shift {
+  width: 100%;
+}
+.day-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 4px;
+  color: #718098;
+  font-size: 12px;
+}
+.day-total strong {
+  font-size: 22px;
+  color: #1a2b44;
+  font-variant-numeric: tabular-nums;
+}
+.crew-section {
+  border: 1px solid #dfe8f6;
+  border-radius: 10px;
+  background: #f7faff;
+  padding: 14px;
+  min-width: 0;
+}
+.crew-section h3 {
+  font-size: 13px;
+  margin-bottom: 12px;
+  color: #3e5d8c;
+}
+.crew-section + .field {
+  margin-top: 2px;
+}
 @theme inline {
   --color-primary: #2563eb;
   --font-sans: "Inter", Arial, Helvetica, sans-serif;

@@ -13,9 +13,30 @@ const pricing = {
   voluminoso_140: "243000.00",
   voluminoso_180: "259000.00",
 };
-let fixture: { vehicle: string; employee: string } | null = null;
-test.afterEach(() => {
+let fixture: { vehicle: string; employee: string; helper: string } | null =
+  null;
+test.afterEach(async () => {
   if (fixture) {
+    const sql = postgres(process.env.DATABASE_URL!, { ssl: "require", max: 1 });
+    try {
+      await sql.begin(async (tx) => {
+        const employee =
+          await tx`select first_name from public.employees where id=${fixture!.helper}`;
+        if (
+          employee.length &&
+          employee[0].first_name !==
+            "QA-" + fixture!.vehicle.slice(0, 8) + " ayudante"
+        )
+          throw new Error("Fixture de ayudante inesperado.");
+        const attendance =
+          await tx`select id::text from public.work_day_employees where employee_id=${fixture!.helper}`;
+        await tx`delete from public.work_day_employees where employee_id=${fixture!.helper}`;
+        await tx`delete from public.employees where id=${fixture!.helper}`;
+        await tx`delete from public.audit_logs where entity_id in ${tx([fixture!.helper, ...attendance.map((a) => a.id)])}`;
+      });
+    } finally {
+      await sql.end();
+    }
     execFileSync(
       process.execPath,
       [
@@ -42,12 +63,14 @@ test("tipos de trabajo, tramos, validación SQL, historial de tarifas y exportac
   });
   const vehicle = randomUUID(),
     employee = randomUUID(),
+    helper = randomUUID(),
     tag = "QA-" + vehicle.slice(0, 8);
-  fixture = { vehicle, employee };
+  fixture = { vehicle, employee, helper };
   try {
     await sql.begin(async (tx) => {
       await tx`insert into public.vehicles(id,name,service_pricing) values(${vehicle},${tag},${tx.json(pricing)})`;
       await tx`insert into public.employees(id,first_name,role) values(${employee},${tag},'chofer')`;
+      await tx`insert into public.employees(id,first_name,role) values(${helper},${tag + " ayudante"},'ayudante')`;
       await tx`insert into public.employee_assignments(employee_id,vehicle_id,role,start_date) values(${employee},${vehicle},'chofer','2026-01-01')`;
     });
     await assert.rejects(
@@ -99,6 +122,12 @@ test("tipos de trabajo, tramos, validación SQL, historial de tarifas y exportac
       "200000.00",
     );
     await type.selectOption("voluminoso");
+    await expect(
+      dialog.getByRole("region", { name: "Personal de la jornada" }),
+    ).toBeVisible();
+    await dialog
+      .getByRole("combobox", { name: "Ayudante que trabajó", exact: true })
+      .selectOption(helper);
     await dialog.getByLabel("Kilómetros recorridos").fill("181");
     await expect(
       dialog.getByRole("button", { name: "Registrar jornada", exact: true }),
@@ -125,8 +154,23 @@ test("tipos de trabajo, tramos, validación SQL, historial de tarifas y exportac
     expect(rows[0].amount).toBe("227000.00");
     expect(rows[0].km).toBe("95.00");
     expect(rows[0].work_type).toBe("voluminoso");
+    const crew =
+      await sql`select a.employee_id,a.role from public.work_day_employees a join public.work_days d on d.id=a.work_day_id where d.vehicle_id=${vehicle}`;
+    expect(crew).toHaveLength(2);
+    expect(
+      crew.some((a) => a.employee_id === helper && a.role === "ayudante"),
+    ).toBe(true);
+    await expect(
+      page.locator("tr").filter({ hasText: tag }).first(),
+    ).toContainText("Ayudante: " + tag + " ayudante");
     await sql`update public.vehicles set service_pricing=${sql.json({ ...pricing, voluminoso_110: "300000.00" })} where id=${vehicle}`;
     dialog = await open("2026-10-20", true);
+    await expect(
+      dialog.getByRole("combobox", {
+        name: "Ayudante que trabajó",
+        exact: true,
+      }),
+    ).toHaveValue(helper);
     await expect(dialog.getByLabel("Facturación del día (ARS)")).toHaveValue(
       "227000.00",
     );
@@ -143,6 +187,9 @@ test("tipos de trabajo, tramos, validación SQL, historial de tarifas y exportac
       .getByRole("combobox", { name: "¿Qué trabajo realizó?", exact: true })
       .selectOption("voluminoso");
     await dialog.getByLabel("Kilómetros recorridos").fill("95");
+    await dialog
+      .getByRole("combobox", { name: "Ayudante que trabajó", exact: true })
+      .selectOption(helper);
     await expect(dialog.getByLabel("Facturación del día (ARS)")).toHaveValue(
       "300000.00",
     );
@@ -167,6 +214,12 @@ test("tipos de trabajo, tramos, validación SQL, historial de tarifas y exportac
     expect(workbook.getWorksheet("Jornadas")!.getCell("H5").value).toBe(
       "95.00",
     );
+    expect(
+      String(workbook.getWorksheet("Jornadas")!.getCell("E5").value),
+    ).toContain("Ayudante: " + tag + " ayudante");
+    expect(
+      String(workbook.getWorksheet("Jornadas")!.getCell("E5").value),
+    ).toContain("Chofer: " + tag);
     expect(workbook.getWorksheet("Resumen")!.getCell("B5").value).toBe(527000);
     await page.setViewportSize({ width: 390, height: 844 });
     dialog = await open("2026-10-21", true);

@@ -8,13 +8,12 @@ import {
   Wallet,
   TrendingUp,
   ReceiptText,
-  CheckCircle2,
   Clock3,
   Banknote,
   AlertCircle,
 } from "lucide-react";
 import type { Data, Vehicle } from "@/lib/types";
-import { workDescription } from "@/lib/service-pricing";
+import { VehicleJournals } from "./vehicle-journals";
 import {
   today,
   currency,
@@ -25,7 +24,7 @@ import {
   dateLabel,
 } from "@/lib/domain";
 import { Badge, Modal, Empty } from "./ui";
-import { DayForm, VehicleForm, ExpenseForm } from "./forms";
+import { VehicleForm, ExpenseForm } from "./forms";
 import { RevenueChart, CategoryChart } from "./charts";
 export function Stat({
   title,
@@ -81,12 +80,23 @@ export function VehicleCard({
   vehicle: Vehicle;
   date: string;
 }) {
-  const day = data.days.find(
-    (d) => d.vehicle_id === vehicle.id && d.work_date === date,
-  );
+  const journals = data.days
+    .filter((d) => d.vehicle_id === vehicle.id && d.work_date === date)
+    .sort((a, b) => (a.shift_number ?? 1) - (b.shift_number ?? 1));
+  const day = journals[0],
+    worked = journals.filter((d) => d.worked);
   const [ms, me] = period(date, "monthly");
   const monthly = report(data, ms, me, vehicle.id);
   const assigned = (role: string) => {
+    if (day?.worked) {
+      const actual = data.attendance.find(
+        (a) => a.work_day_id === day.id && a.role === role,
+      );
+      const employee = data.employees.find((e) => e.id === actual?.employee_id);
+      return employee
+        ? employee.first_name + " " + employee.last_name
+        : "Sin " + role + " registrado";
+    }
     const a = data.assignments.find(
       (a) =>
         a.vehicle_id === vehicle.id &&
@@ -112,26 +122,34 @@ export function VehicleCard({
           <h3>{vehicle.name}</h3>
           <span>{vehicle.license_plate || "Patente pendiente"}</span>
         </div>
-        <Badge tone={day ? (day.worked ? "green" : "neutral") : "amber"}>
-          {day ? (day.worked ? "Trabajó" : "Sin actividad") : "Sin registrar"}
+        <Badge tone={worked.length ? "green" : day ? "neutral" : "amber"}>
+          {worked.length > 1
+            ? "Doble jornada"
+            : worked.length
+              ? "Trabajó"
+              : day
+                ? "Sin actividad"
+                : "Sin registrar"}
         </Badge>
       </div>
-      <div className="vehicle-crew">
-        <div>
-          <span>Chofer</span>
-          <strong>{assigned("chofer")}</strong>
+      {!day && (
+        <div className="vehicle-crew">
+          <div>
+            <span>Chofer</span>
+            <strong>{assigned("chofer")}</strong>
+          </div>
+          <div>
+            <span>Ayudante</span>
+            <strong>{assigned("ayudante")}</strong>
+          </div>
         </div>
-        <div>
-          <span>Ayudante</span>
-          <strong>{assigned("ayudante")}</strong>
-        </div>
-      </div>
+      )}
       <div className="vehicle-numbers">
         <div>
           <span>{day ? "Facturación del día" : "Tarifa diaria"}</span>
           <strong>
             {day
-              ? currency(day.revenue_amount)
+              ? currency(sum(journals.map((d) => d.revenue_amount)))
               : vehicle.service_pricing
                 ? "fija" in vehicle.service_pricing
                   ? currency(vehicle.service_pricing.fija)
@@ -146,63 +164,13 @@ export function VehicleCard({
           <strong>{currency(monthly.revenue)}</strong>
         </div>
       </div>
-      {day?.work_type && (
-        <p className="hint" style={{ marginTop: 10 }}>
-          {workDescription(day)}
-        </p>
-      )}
       <p className="last-day">
         <CalendarDays size={14} />
         {last
           ? "Último día trabajado: " + dateLabel(last.work_date)
           : "Todavía no se registraron jornadas trabajadas"}
       </p>
-      <div className="vehicle-actions">
-        {day ? (
-          <>
-            <Modal
-              title={"Editar jornada · " + vehicle.name}
-              trigger={
-                <span className="button secondary">
-                  Editar registro <ArrowUpRight size={15} />
-                </span>
-              }
-            >
-              <DayForm data={data} vehicle={vehicle} day={day} date={date} />
-            </Modal>
-            <Link
-              className="text-button"
-              href={"/camionetas?vehicle=" + vehicle.id}
-            >
-              Ver detalle <ArrowRight size={14} />
-            </Link>
-          </>
-        ) : (
-          <>
-            <Modal
-              title={"Registrar jornada · " + vehicle.name}
-              trigger={
-                <span className="button">
-                  <CheckCircle2 size={16} /> Se trabajó hoy
-                </span>
-              }
-            >
-              <DayForm data={data} vehicle={vehicle} date={date} />
-            </Modal>
-            <Modal
-              title={"Sin actividad · " + vehicle.name}
-              trigger={<span className="button secondary">No se trabajó</span>}
-            >
-              <DayForm
-                data={data}
-                vehicle={vehicle}
-                date={date}
-                worked={false}
-              />
-            </Modal>
-          </>
-        )}
-      </div>
+      <VehicleJournals data={data} vehicle={vehicle} date={date} dashboard />
     </article>
   );
 }

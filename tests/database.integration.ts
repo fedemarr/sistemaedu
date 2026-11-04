@@ -76,6 +76,48 @@ test("PostgreSQL: integridad financiera, historial, auditoría y RLS (rollback c
           );
         },
       );
+      await t.test(
+        "doble jornada: mismo equipo permitido en otro turno; duplicados y cruces del mismo turno bloqueados",
+        async () => {
+          const rollback = new Error("ROLLBACK_SHIFTS");
+          try {
+            await tx.savepoint(async (sp) => {
+              const second = randomUUID();
+              await sp`insert into public.work_days(id,vehicle_id,work_date,shift_number,worked,revenue_amount) values(${second},${v1},'2026-10-05',2,true,180000)`;
+              await sp`insert into public.work_day_employees(work_day_id,employee_id,role,salary_amount,salary_model) values(${second},${employee},'ayudante',30000,'daily')`;
+              assert.equal(
+                (
+                  await sp`select sum(revenue_amount)::text as total from public.work_days where vehicle_id=${v1} and work_date='2026-10-05'`
+                )[0].total,
+                "400000.00",
+              );
+              await assert.rejects(
+                sp.savepoint(async (p) => {
+                  await p`insert into public.work_days(vehicle_id,work_date,shift_number,worked,revenue_amount) values(${v1},'2026-10-05',2,true,180000)`;
+                }),
+                { code: "23505" },
+              );
+              await assert.rejects(
+                sp.savepoint(async (p) => {
+                  await p`insert into public.work_days(vehicle_id,work_date,shift_number,worked,revenue_amount) values(${v1},'2026-10-05',3,true,180000)`;
+                }),
+                { code: "23514" },
+              );
+              const competing = randomUUID();
+              await sp`insert into public.work_days(id,vehicle_id,work_date,shift_number,worked,revenue_amount) values(${competing},${v2},'2026-10-05',2,true,100000)`;
+              await assert.rejects(
+                sp.savepoint(async (p) => {
+                  await p`insert into public.work_day_employees(work_day_id,employee_id,role,salary_amount,salary_model) values(${competing},${employee},'ayudante',30000,'daily')`;
+                }),
+                { code: "23514" },
+              );
+              throw rollback;
+            });
+          } catch (e) {
+            if (e !== rollback) throw e;
+          }
+        },
+      );
       await tx`insert into public.payroll_periods(id,employee_id,start_date,end_date,days_worked,gross_amount,adjustments,total_amount) values(${payroll},${employee},'2026-10-05','2026-10-11',1,30000,0,30000)`;
       await t.test(
         "liquidación cerrada bloquea cambios históricos y solapamientos",

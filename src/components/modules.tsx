@@ -12,6 +12,7 @@ import {
   FileText,
   SlidersHorizontal,
 } from "lucide-react";
+import { VehicleJournals } from "./vehicle-journals";
 import type { Data, Day } from "@/lib/types";
 import { workDescription } from "@/lib/service-pricing";
 import {
@@ -144,6 +145,7 @@ function DayTable({ data, days }: { data: Data; days: Day[] }) {
     <Table
       headers={[
         "Fecha",
+        "Jornada",
         "Camioneta",
         "Estado",
         "Trabajo / km",
@@ -167,18 +169,24 @@ function DayTable({ data, days }: { data: Data; days: Day[] }) {
         );
         const staff = data.attendance
           .filter((a) => a.work_day_id === d.id)
-          .map((a) => fullName(data, a.employee_id));
+          .map(
+            (a) =>
+              (a.role === "chofer" ? "Chofer: " : "Ayudante: ") +
+              fullName(data, a.employee_id),
+          );
         return {
           key: d.id,
           search: [
             d.work_date,
             vehicle.name,
             workDescription(d),
+            "Jornada " + (d.shift_number ?? 1),
             ...staff,
             d.notes,
           ].join(" "),
           cells: [
             dateLabel(d.work_date),
+            "Jornada " + (d.shift_number ?? 1),
             <strong key="v">{vehicle.name}</strong>,
             <Badge key="s" tone={d.worked ? "green" : "neutral"}>
               {d.worked ? "Trabajó" : "Sin actividad"}
@@ -329,6 +337,26 @@ export function DailyModule({
                     ) : null,
                   )}
                 </div>
+                {data.days.some(
+                  (w) =>
+                    w.work_date === d &&
+                    w.worked &&
+                    w.shift_number === 2 &&
+                    data.days.some(
+                      (first) =>
+                        first.vehicle_id === w.vehicle_id &&
+                        first.work_date === d &&
+                        first.worked &&
+                        (first.shift_number ?? 1) === 1,
+                    ),
+                ) && (
+                  <small
+                    className="double-day-marker"
+                    title="Incluye doble jornada"
+                  >
+                    ×2
+                  </small>
+                )}
               </Link>
             ))}
           </div>
@@ -344,62 +372,46 @@ export function DailyModule({
         <section>
           <SectionHead
             title={dateLabel(selected)}
-            subtitle="Una jornada por camioneta y fecha"
+            subtitle="Primera y segunda jornada, cada una con su trabajo y personal"
           />
           <div className="daily-cards">
             {units.map((v) => {
-              const d = data.days.find(
-                (d) => d.vehicle_id === v.id && d.work_date === selected,
-              );
+              const journals = data.days.filter(
+                  (d) => d.vehicle_id === v.id && d.work_date === selected,
+                ),
+                worked = journals.filter((d) => d.worked);
               return (
                 <article className="daily-unit panel" key={v.id}>
                   <div className="daily-unit-title">
                     <Truck size={23} />
                     <h3>{v.name}</h3>
                     <Badge
-                      tone={d ? (d.worked ? "green" : "neutral") : "amber"}
-                    >
-                      {d
-                        ? d.worked
-                          ? "Trabajó"
-                          : "No trabajó"
-                        : "Sin registrar"}
-                    </Badge>
-                  </div>
-                  <div className="daily-unit-bottom">
-                    <div>
-                      <small>
-                        {d ? "Facturación registrada" : "Tarifa predeterminada"}
-                      </small>
-                      <strong>
-                        {d
-                          ? currency(d.revenue_amount)
-                          : v.service_pricing
-                            ? "fija" in v.service_pricing
-                              ? currency(v.service_pricing.fija)
-                              : "Según el trabajo"
-                            : v.default_daily_rate !== null
-                              ? currency(v.default_daily_rate)
-                              : "A configurar"}
-                      </strong>
-                    </div>
-                    <Modal
-                      title={(d ? "Editar" : "Registrar") + " · " + v.name}
-                      trigger={
-                        <span className="button">
-                          {d ? "Editar registro" : "Registrar jornada"}
-                          <ArrowRight size={16} />
-                        </span>
+                      tone={
+                        worked.length
+                          ? "green"
+                          : journals.length
+                            ? "neutral"
+                            : "amber"
                       }
                     >
-                      <DayForm
-                        data={data}
-                        vehicle={v}
-                        date={selected}
-                        day={d}
-                      />
-                    </Modal>
+                      {worked.length > 1
+                        ? "Doble jornada"
+                        : worked.length
+                          ? "Trabajó"
+                          : journals.length
+                            ? "Sin actividad"
+                            : "Sin registrar"}
+                    </Badge>
                   </div>
+                  {!!journals.length && (
+                    <div className="day-total">
+                      <span>Total del día</span>
+                      <strong>
+                        {currency(sum(journals.map((d) => d.revenue_amount)))}
+                      </strong>
+                    </div>
+                  )}
+                  <VehicleJournals data={data} vehicle={v} date={selected} />
                 </article>
               );
             })}
@@ -967,7 +979,7 @@ export function PayrollModule({ data }: { data: Data }) {
           headers={[
             "Empleado",
             "Período",
-            "Días",
+            "Jornadas",
             "Bruto",
             "Ajustes",
             "Total",
@@ -1081,11 +1093,15 @@ function MovementHistory({
                     d
                       ? vehicleName(data, d.vehicle_id) +
                         " · " +
-                        dateLabel(d.work_date)
+                        dateLabel(d.work_date) +
+                        " · Jornada " +
+                        (d.shift_number ?? 1)
                       : c.vehicle_id && c.work_date
                         ? vehicleName(data, c.vehicle_id) +
                           " · " +
-                          dateLabel(c.work_date)
+                          dateLabel(c.work_date) +
+                          " · Jornada " +
+                          (c.shift_number ?? 1)
                         : "Jornada fuera del período cargado",
                     currency(c.amount),
                     c.payment_method ?? "—",

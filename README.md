@@ -53,10 +53,11 @@ Los montos se guardan en `NUMERIC(14,2)` y se calculan con Decimal.js, redondean
 
 **Caja = cobros efectivos − pagos de gastos − pagos de sueldos**, usando las fechas de cada movimiento. Pagar una liquidación no crea un nuevo gasto salarial.
 
-- Una sola jornada por camioneta y fecha, garantizada por PostgreSQL. Si no trabajó, factura cero. Cada persona puede figurar en una sola camioneta en una fecha.
+- Hasta dos jornadas por camioneta y fecha, cada una con su propio trabajo, tarifa, chofer y ayudante. PostgreSQL impide duplicar el número de jornada. Si no trabajó, factura cero. Una persona no puede figurar en dos camionetas en la misma jornada, pero puede trabajar en la primera y en la segunda del día.
 - La tarifa de facturación y el salario por jornada quedan conservados en la jornada. Un cambio de configuración no los reescribe.
 - Semana: lunes a domingo. Quincena: 1–15 o 16–último día. Mes: calendario argentino.
 - Los salarios fijos se devengan por día calendario del período, hasta la fecha actual. El redondeo acumulado mantiene el importe exacto de cada período completo.
+- El botón «Agregar segunda jornada» permite cargar otro trabajo y otro equipo para la misma camioneta y fecha. Se suman las facturaciones de ambas jornadas. Los empleados por jornada cobran un jornal por cada jornada efectivamente trabajada; los sueldos fijos no se duplican. El calendario marca ×2 y el historial y las exportaciones distinguen Jornada 1 y Jornada 2.
 - Los salarios fijos son costos generales sin asignación automática a vehículos. Los salarios por jornada se atribuyen a la camioneta realmente trabajada. No hay descuentos legales, impuestos ni prorrateo de gastos generales automáticos.
 - Los cambios salariales rigen desde el día en que se configuran. Las jornadas anteriores sin tarifa pueden corregirse con una excepción diaria explícita; no se infieren salarios pendientes.
 - Solo se cierran períodos completos finalizados. Se guardan las líneas de devengamiento, el bruto, el ajuste y el total. El cierre bloquea cambios en las asistencias de ese período; para corregirlo, primero se anulan sus pagos y luego la liquidación.

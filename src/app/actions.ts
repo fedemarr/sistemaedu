@@ -112,6 +112,12 @@ async function saveDay(tx: Tx, f: FormData) {
   if (id) uuid.parse(id);
   const vehicleId = uuid.parse(get(f, "vehicle_id")),
     workDate = date.parse(get(f, "work_date"));
+  const shiftNumber = z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(2)
+    .parse(get(f, "shift_number") || "1");
   if (workDate > today())
     throw new Error("No se pueden registrar jornadas futuras.");
   const worked = get(f, "worked") === "true";
@@ -193,10 +199,10 @@ async function saveDay(tx: Tx, f: FormData) {
         "El empleado ya tiene una liquidación cerrada para esa fecha.",
       );
     const other =
-      await tx`select d.id from public.work_day_employees a join public.work_days d on d.id=a.work_day_id where a.employee_id=${employeeId} and d.work_date=${workDate} and d.id<>${id || "00000000-0000-4000-8000-000000000000"} and d.worked`;
+      await tx`select d.id from public.work_day_employees a join public.work_days d on d.id=a.work_day_id where a.employee_id=${employeeId} and d.work_date=${workDate} and d.shift_number=${shiftNumber} and d.id<>${id || "00000000-0000-4000-8000-000000000000"} and d.worked`;
     if (other.length)
       throw new Error(
-        "El empleado ya está registrado en otra camioneta ese día.",
+        "El empleado ya está registrado en otra camioneta en esta jornada.",
       );
     const salaries =
       await tx`select amount,payment_model from public.salary_settings where employee_id=${employeeId} and valid_from<=${workDate} and (valid_until is null or valid_until>=${workDate}) order by valid_from desc limit 1`;
@@ -228,7 +234,7 @@ async function saveDay(tx: Tx, f: FormData) {
   let dayId = id;
   if (id) {
     const updated =
-      await tx`update public.work_days set worked=${worked},revenue_amount=${revenue},work_type=${selectedService},distance_km=${kilometers},pricing_snapshot=${pricingSnapshot ? tx.json(pricingSnapshot) : null},notes=${nullable(text.parse(get(f, "notes")))},updated_at=now() where id=${id} and vehicle_id=${vehicleId} and work_date=${workDate} and updated_at=${get(f, "version")}::timestamptz returning id`;
+      await tx`update public.work_days set worked=${worked},revenue_amount=${revenue},work_type=${selectedService},distance_km=${kilometers},pricing_snapshot=${pricingSnapshot ? tx.json(pricingSnapshot) : null},notes=${nullable(text.parse(get(f, "notes")))},updated_at=now() where id=${id} and vehicle_id=${vehicleId} and work_date=${workDate} and shift_number=${shiftNumber} and updated_at=${get(f, "version")}::timestamptz returning id`;
     if (!updated.length)
       throw new Error(
         "La jornada cambió en otra ventana. Actualizá la página antes de editar.",
@@ -236,7 +242,7 @@ async function saveDay(tx: Tx, f: FormData) {
     await tx`delete from public.work_day_employees where work_day_id=${id}`;
   } else {
     const inserted =
-      await tx`insert into public.work_days(vehicle_id,work_date,worked,revenue_amount,work_type,distance_km,pricing_snapshot,notes) values(${vehicleId},${workDate},${worked},${revenue},${selectedService},${kilometers},${pricingSnapshot ? tx.json(pricingSnapshot) : null},${nullable(text.parse(get(f, "notes")))}) returning id`;
+      await tx`insert into public.work_days(vehicle_id,work_date,shift_number,worked,revenue_amount,work_type,distance_km,pricing_snapshot,notes) values(${vehicleId},${workDate},${shiftNumber},${worked},${revenue},${selectedService},${kilometers},${pricingSnapshot ? tx.json(pricingSnapshot) : null},${nullable(text.parse(get(f, "notes")))}) returning id`;
     dayId = inserted[0].id;
   }
   for (const a of staff)

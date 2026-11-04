@@ -234,12 +234,14 @@ export function DayForm({
   day,
   date,
   worked: initialWorked = true,
+  shiftNumber = 1,
 }: {
   data: Data;
   vehicle: Vehicle;
   day?: Day;
   date: string;
   worked?: boolean;
+  shiftNumber?: number;
 }) {
   const [worked, setWorked] = useState(day?.worked ?? initialWorked);
   const pricing = day?.pricing_snapshot ?? vehicle.service_pricing;
@@ -267,6 +269,35 @@ export function DayForm({
     )?.employee_id ?? "";
   const attendance = (role: string) =>
     data.attendance.find((a) => a.work_day_id === day?.id && a.role === role);
+  const crew = (
+    <section className="crew-section" aria-label="Personal de la jornada">
+      <h3>Chofer y ayudante que trabajaron</h3>
+      <div className="form-grid">
+        {(["chofer", "ayudante"] as const).map((role, i) => (
+          <Field
+            key={role}
+            label={i === 0 ? "Chofer que trabajó" : "Ayudante que trabajó"}
+          >
+            <select
+              name={i === 0 ? "driver_id" : "helper_id"}
+              defaultValue={attendance(role)?.employee_id ?? assigned(role)}
+            >
+              <option value="">Sin {role}</option>
+              {data.employees
+                .filter(
+                  (e) => e.is_active || e.id === attendance(role)?.employee_id,
+                )
+                .map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.first_name} {e.last_name}
+                  </option>
+                ))}
+            </select>
+          </Field>
+        ))}
+      </div>
+    </section>
+  );
   return (
     <SaveForm
       operation="day"
@@ -276,6 +307,12 @@ export function DayForm({
       <input name="id" type="hidden" value={day?.id ?? ""} />
       <input name="version" type="hidden" value={day?.updated_at ?? ""} />
       <input name="vehicle_id" type="hidden" value={vehicle.id} />
+      <input
+        name="shift_number"
+        type="hidden"
+        value={day?.shift_number ?? shiftNumber}
+      />
+      <Badge tone="blue">Jornada {day?.shift_number ?? shiftNumber}</Badge>
       <div className="form-grid">
         <Field label="Camioneta">
           <Input value={vehicle.name} readOnly />
@@ -303,6 +340,7 @@ export function DayForm({
       </Field>
       {worked ? (
         <>
+          {!pricing && crew}
           {pricing && (
             <>
               <Field label="¿Qué trabajo realizó?">
@@ -326,6 +364,7 @@ export function DayForm({
                   ))}
                 </select>
               </Field>
+              {crew}
               {workType === "voluminoso" && (
                 <Field
                   label="Kilómetros recorridos"
@@ -398,46 +437,30 @@ export function DayForm({
               defaultValue={day?.revenue_amount ?? vehicle.default_daily_rate}
             />
           )}
-          <div className="form-grid">
-            {(["chofer", "ayudante"] as const).map((role, i) => (
-              <div key={role}>
-                <Field
-                  label={
-                    i === 0 ? "Chofer que trabajó" : "Ayudante que trabajó"
-                  }
-                >
-                  <select
-                    name={i === 0 ? "driver_id" : "helper_id"}
-                    defaultValue={
-                      attendance(role)?.employee_id ?? assigned(role)
+          <details>
+            <summary className="text-button">
+              Ajustar tarifas salariales (opcional)
+            </summary>
+            <div className="form-grid">
+              {(["chofer", "ayudante"] as const).map((role, i) => (
+                <div key={role}>
+                  <Amount
+                    name={i === 0 ? "driver_salary" : "helper_salary"}
+                    label={
+                      (i === 0 ? "Chofer" : "Ayudante") +
+                      " · tarifa salarial excepcional"
                     }
-                  >
-                    <option value="">Sin {role}</option>
-                    {data.employees
-                      .filter(
-                        (e) =>
-                          e.is_active || e.id === attendance(role)?.employee_id,
-                      )
-                      .map((e) => (
-                        <option key={e.id} value={e.id}>
-                          {e.first_name} {e.last_name}
-                        </option>
-                      ))}
-                  </select>
-                </Field>
-                <Amount
-                  name={i === 0 ? "driver_salary" : "helper_salary"}
-                  label="Tarifa salarial excepcional (opcional)"
-                  defaultValue={
-                    attendance(role)?.salary_model === "daily"
-                      ? attendance(role)?.salary_amount
-                      : null
-                  }
-                  required={false}
-                />
-              </div>
-            ))}
-          </div>
+                    defaultValue={
+                      attendance(role)?.salary_model === "daily"
+                        ? attendance(role)?.salary_amount
+                        : null
+                    }
+                    required={false}
+                  />
+                </div>
+              ))}
+            </div>
+          </details>
           <p className="hint">
             Si no indicás una excepción, se aplica el salario configurado para
             esa fecha. Registrar facturación no registra automáticamente un
@@ -699,7 +722,7 @@ export function PayrollForm({ data }: { data: Data }) {
               {dateLabel(preview.start)} — {dateLabel(preview.end)}
             </Badge>
             <div>
-              <span>Días efectivamente trabajados</span>
+              <span>Jornadas efectivamente trabajadas</span>
               <strong>{preview.days}</strong>
             </div>
             <div>

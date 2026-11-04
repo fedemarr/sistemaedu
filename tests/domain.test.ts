@@ -245,6 +245,27 @@ test("semanas cruzan meses y años sin depender de la zona horaria del servidor"
     "2027-01-03",
   ]);
 });
+test("doble jornada suma dos ingresos y dos jornales diarios, sin duplicar sueldos fijos", () => {
+  const d = fixture();
+  d.days[0].shift_number = 1;
+  d.days.push({ ...d.days[0], id: "second", shift_number: 2 });
+  d.attendance.push({
+    ...d.attendance[0],
+    id: "second-person",
+    work_day_id: "second",
+  });
+  const r = report(d, "2026-10-05", "2026-10-05", "v1");
+  assert.equal(r.revenue, "400000.00");
+  assert.equal(r.worked, 2);
+  assert.equal(r.salary, "60000.00");
+  const weekly = payrollPreview(d, "fede", "2026-10-05", "2026-10-11");
+  assert.equal(weekly.days, 2);
+  assert.equal(weekly.gross, "60000.00");
+  assert.equal(
+    payrollPreview(d, "edu", "2026-10-01", "2026-10-15").gross,
+    "300000.00",
+  );
+});
 test("los salarios fijos no se devengan en fechas futuras", () => {
   const d = fixture();
   const future = addDays(today(), 1);
