@@ -53,7 +53,7 @@ Los montos se guardan en `NUMERIC(14,2)` y se calculan con Decimal.js, redondean
 
 **Caja = cobros efectivos − pagos de gastos − pagos de sueldos**, usando las fechas de cada movimiento. Pagar una liquidación no crea un nuevo gasto salarial.
 
-- Hasta dos jornadas por camioneta y fecha, cada una con su propio trabajo, tarifa, chofer y ayudante. PostgreSQL impide duplicar el número de jornada. Si no trabajó, factura cero. Una persona no puede figurar en dos camionetas en la misma jornada, pero puede trabajar en la primera y en la segunda del día.
+- Hasta dos jornadas por camioneta y fecha, cada una con su propio trabajo, tarifa, chofer y ayudante. PostgreSQL impide duplicar el número de jornada. Si no trabajó, factura cero. Una persona puede trabajar en distintas camionetas el mismo día, aunque ambos registros sean Jornada 1 de cada unidad. Cada trabajo suma su asistencia y su jornal; no puede repetirse como chofer y ayudante dentro del mismo registro.
 - La tarifa de facturación y el salario por jornada quedan conservados en la jornada. Un cambio de configuración no los reescribe.
 - Semana: lunes a domingo. Quincena: 1–15 o 16–último día. Mes: calendario argentino.
 - Los salarios fijos se devengan por día calendario del período, hasta la fecha actual. El redondeo acumulado mantiene el importe exacto de cada período completo.

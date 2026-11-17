@@ -198,12 +198,6 @@ async function saveDay(tx: Tx, f: FormData) {
       throw new Error(
         "El empleado ya tiene una liquidación cerrada para esa fecha.",
       );
-    const other =
-      await tx`select d.id from public.work_day_employees a join public.work_days d on d.id=a.work_day_id where a.employee_id=${employeeId} and d.work_date=${workDate} and d.shift_number=${shiftNumber} and d.id<>${id || "00000000-0000-4000-8000-000000000000"} and d.worked`;
-    if (other.length)
-      throw new Error(
-        "El empleado ya está registrado en otra camioneta en esta jornada.",
-      );
     const salaries =
       await tx`select amount,payment_model from public.salary_settings where employee_id=${employeeId} and valid_from<=${workDate} and (valid_until is null or valid_until>=${workDate}) order by valid_from desc limit 1`;
     const override = get(

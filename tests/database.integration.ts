@@ -65,19 +65,32 @@ test("PostgreSQL: integridad financiera, historial, auditoría y RLS (rollback c
       );
       await tx`insert into public.work_day_employees(work_day_id,employee_id,role,salary_amount,salary_model) values(${day1},${employee},'ayudante',30000,'daily')`;
       await t.test(
-        "un empleado no puede trabajar en dos unidades la misma fecha",
+        "un empleado trabaja en ambas unidades con Jornada 1 y cobra ambos jornales",
         async () => {
-          await tx`update public.work_days set worked=true,revenue_amount=180000 where id=${day2}`;
-          await assert.rejects(
-            tx.savepoint(async (sp) => {
+          const rollback = new Error("ROLLBACK_CROSS_VEHICLE");
+          try {
+            await tx.savepoint(async (sp) => {
+              await sp`update public.work_days set worked=true,revenue_amount=180000 where id=${day2}`;
               await sp`insert into public.work_day_employees(work_day_id,employee_id,role,salary_amount,salary_model) values(${day2},${employee},'ayudante',30000,'daily')`;
-            }),
-            { code: "23514" },
-          );
+              const [result] =
+                await sp`select count(*)::int as jornadas,sum(a.salary_amount)::text as wages from public.work_day_employees a join public.work_days d on d.id=a.work_day_id where a.employee_id=${employee} and d.work_date='2026-10-05'`;
+              assert.equal(result.jornadas, 2);
+              assert.equal(result.wages, "60000.00");
+              await assert.rejects(
+                sp.savepoint(async (p) => {
+                  await p`insert into public.work_day_employees(work_day_id,employee_id,role,salary_amount,salary_model) values(${day2},${employee},'chofer',30000,'daily')`;
+                }),
+                { code: "23505" },
+              );
+              throw rollback;
+            });
+          } catch (e) {
+            if (e !== rollback) throw e;
+          }
         },
       );
       await t.test(
-        "doble jornada: mismo equipo permitido en otro turno; duplicados y cruces del mismo turno bloqueados",
+        "doble jornada: permite cambiar de camioneta; impide duplicar el registro y crear un tercer turno",
         async () => {
           const rollback = new Error("ROLLBACK_SHIFTS");
           try {
@@ -105,12 +118,8 @@ test("PostgreSQL: integridad financiera, historial, auditoría y RLS (rollback c
               );
               const competing = randomUUID();
               await sp`insert into public.work_days(id,vehicle_id,work_date,shift_number,worked,revenue_amount) values(${competing},${v2},'2026-10-05',2,true,100000)`;
-              await assert.rejects(
-                sp.savepoint(async (p) => {
-                  await p`insert into public.work_day_employees(work_day_id,employee_id,role,salary_amount,salary_model) values(${competing},${employee},'ayudante',30000,'daily')`;
-                }),
-                { code: "23514" },
-              );
+              await sp`update public.work_days set worked=true,revenue_amount=180000 where id=${day2}`;
+              await sp`insert into public.work_day_employees(work_day_id,employee_id,role,salary_amount,salary_model) values(${competing},${employee},'ayudante',30000,'daily')`;
               throw rollback;
             });
           } catch (e) {
